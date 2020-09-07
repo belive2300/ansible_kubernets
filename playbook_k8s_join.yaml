@@ -1,0 +1,52 @@
+---
+- hosts: master
+
+  vars_prompt:
+    - name: cluster_subnet
+      prompt: "Enter your k8s cluster subnet, Remember to add a subnet mask (e.q 192.168.2.0/24 ) , default is '172.24.0.0/16' : "
+      private: no
+
+  tasks:
+
+  - name: Reset Kubernetes component
+    shell: "kubeadm reset --force"
+
+  - name: kubeadm Init cluster
+    shell: >
+       kubeadm init
+       --pod-network-cidr={{ cluster_subnet | default('172.24.0.0/16')}} | tail -2
+    register: init_cluster
+
+  - debug:
+      msg: "{{ init_cluster }}"
+
+  - name: cluster join
+    shell: "{{ init_cluster.stdout }}"
+    delegate_to: "{{ item }}"
+    loop: "{{ groups['work'] }}"
+          
+  - name: create user k8s config file
+    file:
+      path: /home/{{ ansible_user }}/.kube
+            #path: "{{ ansible_env.HOME }}/.kube"
+      state: directory
+      owner: "{{ ansible_user }}"
+      group: "{{ ansible_user }}"
+      mode: 0755
+
+  - name: copy kubernets config
+    copy:
+      src: /etc/kubernetes/admin.conf
+      dest: /home/{{ ansible_user }}/.kube/config
+      #dest: "{{ ansible_env.HOME }}/.kube/config"
+      remote_src: yes
+      owner: "{{ ansible_user | default(ansible_user_id) }}"
+      group: "{{ ansible_user | default(ansible_user_id) }}"
+      mode: 0755
+    when: init_cluster is succeeded
+
+  - name: install weave net
+    k8s:
+      state: present
+      src: >
+        https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')

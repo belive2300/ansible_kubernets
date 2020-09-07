@@ -28,7 +28,7 @@
   - name: create user k8s config file
     file:
       path: /home/{{ ansible_user }}/.kube
-            #path: "{{ ansible_env.HOME }}/.kube"
+      #path: "{{ ansible_env.HOME }}/.kube"
       state: directory
       owner: "{{ ansible_user }}"
       group: "{{ ansible_user }}"

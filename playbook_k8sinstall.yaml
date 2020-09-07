@@ -32,14 +32,6 @@
       #delegate_to: "{{ host_ip }}"
       #notify: set host name
 
-    - name: copy docker daemon file
-      copy:
-        src: file/daemon.json
-        dest: /etc/docker/daemon.json
-        owner: root
-        group: root
-        mode: 0644
-
     - name: systemd daemon reload
       systemd:
         daemon_reload: yes

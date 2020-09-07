@@ -1,0 +1,45 @@
+---
+- hosts: master
+  gather_facts: no
+
+  tasks:
+  - name: create nfs Persistent Volume
+    k8s:
+      state: present
+      src: <nfs.yaml>
+
+  - name: deploy nginx & mysql pod
+    k8s:
+      state: present
+      definition:
+        apiVersion: v1
+        kind: Pod
+        metadata:
+          name: test
+          namespace: taipay-service
+          labels:
+            app: web-test
+        spec:
+          containers:
+          - name: test
+            imagePullPolicy: IfNotPresent
+            image: nginx:latest
+            ports:
+            - containerPort: 80
+            - containerPort: 443
+            volumeMounts:
+            - name: test-nfs
+              mountPath: "/tmp/test"
+              subPath: "test"
+          - name: test2
+            imagePullPolicy: IfNotPresent
+            image: mysql:5.7.31
+            ports:
+            - containerPort: 3306
+            env:
+            - name: MYSQL_ROOT_PASSWORD
+              value: <SQL ROOT PASSWORD>
+          volumes:
+            - name: test-nfs
+              persistenVolumeClaim:
+                ClaimName: test-nfs

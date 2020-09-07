@@ -1,0 +1,82 @@
+---
+- hosts: all
+  gather_facts: no
+
+  tasks:
+
+    - name: check apt update
+      apt:
+        update_cache: yes
+          
+    - name: check docker install
+      command: docker ps -a
+      register: dockerinstall
+      ignore_errors: true
+
+    - name: if docker doesnt install then download docker & install
+      include_tasks: tasks/playbook_docker_install.yml
+      when: dockerinstall.rc != 0
+    
+      #- name: change master-node hostname
+      #hostname:
+      #  name: "{{ hostname_new }}"
+      #delegate_to: "{{ item }}"
+      #loop: "{{ groups['master'] }}"
+
+    - name: change all node hostname
+      hostname: 
+        name: "{{ hostname_new }}"
+      #      hostname:
+      #  name: "{{ 'work-node%02x' | format(item) }}"
+      #loop: "{{ range(1, groups['work'] | length  + 1, 1)|list }}"
+      #delegate_to: "{{ host_ip }}"
+      #notify: set host name
+
+    - name: copy docker daemon file
+      copy:
+        src: file/daemon.json
+        dest: /etc/docker/daemon.json
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: systemd daemon reload
+      systemd:
+        daemon_reload: yes
+    
+    - name: docker service restart
+      systemd:
+        name: docker
+        state: restarted
+
+    - name: disable SWAP with command
+      shell: swapoff -a
+
+    - name: disable SWAP in fstab
+      replace:
+        path: /etc/fstab
+        regexp: '^([^#].*?\sswap\s+sw\s+.*)$'
+        replace: '# \1'
+
+    - name: add k8s apt key
+      apt_key:
+        url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+        state: present
+
+    - name: add k8s repo
+      apt_repository:
+        repo: deb http://apt.kubernetes.io/ kubernetes-xenial main
+        state: present
+
+    - name: install most new version kubernets
+      apt:
+        pkg:
+        - kubeadm
+        - kubelet
+        - kubectl
+        state: latest
+    
+    - name: mark kubernets
+      command: apt-mark hold kubeadm kubelet kubectl
+  
+- import_playbook: playbook_k8s_join.yml
